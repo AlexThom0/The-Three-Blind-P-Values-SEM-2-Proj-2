@@ -90,63 +90,136 @@ for(i in 1:length(mixedtexts100$texts))
 
 
 
+###### Figuring out training and test split stuff
+set.seed(123) 
+
+# Create folder map from human texts (works for all lengths)
+# Because the folder structure is the same across all datasets
+humantexts <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/human/")
+n_folders <- length(humantexts$texts)
+folder_map <- rep(1:n_folders, times = sapply(humantexts$texts, length))
+
+cat("Total folders:", n_folders, "\n")
+cat("Total essays:", length(folder_map), "\n")
+
+ # for reproducibility
+test_folders <- sample(1:n_folders, size = floor(0.3 * n_folders))
+train_folders <- setdiff(1:n_folders, test_folders)
+
+cat("Training folders:", length(train_folders), " (", length(train_folders)/n_folders*100, "%)\n")
+cat("Test folders:", length(test_folders), " (", length(test_folders)/n_folders*100, "%)\n")
+
+# Get row indices
+train_rows <- which(folder_map %in% train_folders)
+test_rows <- which(folder_map %in% test_folders)
+
+cat("\nTraining essays:", length(train_rows), " (", length(train_rows)/length(folder_map)*100, "%)\n")
+cat("Test essays:", length(test_rows), " (", length(test_rows)/length(folder_map)*100, "%)\n")
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-# 1. Create a "Map" of which folder each essay belongs to
-# This creates a vector like c(1, 1, 2, 2, 2, 3, ...) 
-folder_map <- rep(1:length(humantexts$texts), times = sapply(humantexts$texts, length))
-
-# 2. Pick which FOLDERS to use for Testing (30%)
-set.seed(123)
-n_folders <- length(mixedtexts$texts)
-test_folder_idx <- sample(1:n_folders, size = floor(0.3 * n_folders))
-
-# 3. Identify which ROWS in the flat count matrices belong to Training folders
-# We keep rows where the folder_map is NOT in our test list
-train_rows_idx <- which(!(folder_map %in% test_folder_idx))
-
-# 4. Calculate Signatures using only those Training Rows
-alpha <- 1
-humantheta <- colSums(humancounts[train_rows_idx, ]) + alpha
-humantheta <- humantheta / sum(humantheta)
-
-GPTtheta <- colSums(GPTcounts[train_rows_idx, ]) + alpha
-GPTtheta <- GPTtheta / sum(GPTtheta)
-
-all_errors_start <- c()
-
-for(i in test_folder_idx) { 
-  for(j in 1:length(mixedtexts$texts[[i]])) {
-    
-    y <- text_to_fw_indices(mixedtexts$texts[[i]][[j]], functionwords)
-    cps <- cp_posterior(y, humantheta, GPTtheta, skip = 50, min_length = 100)
-    
-    est1 <- cps$c1[1]
-    
-    # Matching the truth
-    true_vals <- as.numeric(strsplit(truecps$texts[[i]][[j]], ",")[[1]])
-    
-    error <- abs(est1 - true_vals[1])
-    all_errors_start <- c(all_errors_start, error)
-    
-    print(paste("Folder:", i, "Essay:", j, "| Error:", error))
+# Function to analyze test set
+analyze_test_set <- function(mixed_data, true_data, GPTtheta, 
+                             test_folders, segment_name) {
+  
+  cat("\n", paste(rep("=", 60), collapse = ""))
+  cat("\n", segment_name, "- TEST SET ONLY")
+  cat("\n", paste(rep("=", 60), collapse = ""), "\n")
+  
+  skip <- 50
+  min_length <- 100
+  total <- 0
+  
+  errors_start <- c()
+  errors_end <- c()
+  
+  for(i in test_folders) {
+    for(j in 1:length(mixed_data$texts[[i]])) {
+      
+      y <- text_to_fw_indices(mixed_data$texts[[i]][[j]], functionwords)
+      
+      cps <- tryCatch({
+        cp_posterior(y, humantheta, GPTtheta, skip, min_length)
+      }, error = function(e) NULL)
+      
+      if(is.null(cps) || nrow(cps) == 0) next
+      
+      est_start <- cps[1, 1]
+      est_end <- cps[1, 2]
+      
+      true_vals <- as.numeric(strsplit(true_data$texts[[i]][[j]], ",")[[1]])
+      
+      errors_start <- c(errors_start, abs(est_start - true_vals[1]))
+      errors_end <- c(errors_end, abs(est_end - true_vals[2]))
+      
+      total <- total + 1
+      
+      # Print progress every 50 essays
+      if(total %% 50 == 0) {
+        cat(sprintf("  Processed %d test essays...\n", total))
+      }
+    }
   }
+  
+  # Results
+  cat("\n", paste(rep("-", 40), collapse = ""))
+  cat("\nRESULTS FOR", segment_name)
+  cat("\n", paste(rep("-", 40), collapse = ""), "\n")
+  cat("Test essays analyzed:", total, "\n\n")
+  
+  cat("START POINT ERRORS:\n")
+  cat(sprintf("  Mean: %.2f\n", mean(errors_start)))
+  cat(sprintf("  Median: %.2f\n", median(errors_start)))
+  cat(sprintf("  SD: %.2f\n", sd(errors_start)))
+  cat(sprintf("  Range: [%.0f, %.0f]\n", min(errors_start), max(errors_start)))
+  
+  cat("\nEND POINT ERRORS:\n")
+  cat(sprintf("  Mean: %.2f\n", mean(errors_end)))
+  cat(sprintf("  Median: %.2f\n", median(errors_end)))
+  cat(sprintf("  SD: %.2f\n", sd(errors_end)))
+  cat(sprintf("  Range: [%.0f, %.0f]\n", min(errors_end), max(errors_end)))
+  
+  return(list(
+    start = errors_start,
+    end = errors_end,
+    n = total
+  ))
 }
+
+# Run for all three
+cat("\n\nSTARTING EVALUATION ON TEST SET\n")
+cat("================================\n")
+
+results500 <- analyze_test_set(
+  mixed_data = mixedtexts,
+  true_data = truecps,
+  GPTtheta = GPTtheta500,
+  test_folders = test_folders,
+  segment_name = "500-WORD SEGMENTS"
+)
+
+results200 <- analyze_test_set(
+  mixed_data = mixedtexts200,
+  true_data = truecps200,
+  GPTtheta = GPTtheta200,
+  test_folders = test_folders,
+  segment_name = "200-WORD SEGMENTS"
+)
+
+results100 <- analyze_test_set(
+  mixed_data = mixedtexts100,
+  true_data = truecps100,
+  GPTtheta = GPTtheta100,
+  test_folders = test_folders,
+  segment_name = "100-WORD SEGMENTS"
+)
+
+
+
+
+
 
 
 
