@@ -23,17 +23,18 @@ data <- load("~/Desktop/Uni/Stats Case Studies/Stylo/The-Three-Blind-P-Values-SE
 #min_length is the minimum length of the GPT segment
 skip <- 50
 min_length <- 100
+c = 0
 for(i in 1:length(mixedtexts$texts))
   for(j in 1:length(mixedtexts$texts[[i]])){
 
 
-y <- text_to_fw_indices(mixedtexts$texts[[i]][[j]],functionwords)
-cps <- cp_posterior(y, humantheta, GPTtheta, skip = skip, min_length =min_length )
-est <- cps[1,][1:2]
-
-true <- truecps$texts[[i]][[j]]
-result <- paste('Est. change points are ', toString(est), ". True change point is", true)
-print(result)}
+    y <- text_to_fw_indices(mixedtexts$texts[[i]][[j]],functionwords)
+    cps <- cp_posterior(y, humantheta, GPTtheta, skip = skip, min_length =min_length )
+    est <- cps[1,][1:2]
+    c = c + 1
+    true <- truecps$texts[[i]][[j]]
+    result <- paste('Est. change points are ', toString(est), ". True change point is", true, ". Count =",c)
+    print(result)}
 
 ##########################
 ### Hypothesis Testing ###
