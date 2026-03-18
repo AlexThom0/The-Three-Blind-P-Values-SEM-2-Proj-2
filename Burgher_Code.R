@@ -218,15 +218,73 @@ results100 <- analyze_test_set(
 
 
 
+logBFs <- c()
+true_labels <- c()
+row_ids <- c()
+
+row_id <- 0
+
+for(i in 1:length(humantexts$texts)) {
+  for(j in 1:length(humantexts$texts[[i]])) {
+    
+    row_id <- row_id + 1
+    
+    if(!(row_id %in% test_idx)) next
+    
+    # ------------------------
+    # HUMAN TEXT (label = 0)
+    # ------------------------
+    
+    y <- text_to_fw_indices(humantexts$texts[[i]][[j]], functionwords)
+    
+    cps <- cp_posterior(y, humantheta, GPTtheta, 
+                        skip = skip, min_length = min_length)
+    
+    M0 <- sequenceLikelihood(y, humantheta)
+    M1 <- logmeanexp(cps$loglik)
+    
+    logBF <- M0 - M1
+    
+    logBFs <- c(logBFs, logBF)
+    true_labels <- c(true_labels, 0)
+    row_ids <- c(row_ids, row_id)
+  }
+}
 
 
+row_id <- 0
+
+for(i in 1:length(mixedtexts$texts)) {
+  for(j in 1:length(mixedtexts$texts[[i]])) {
+    
+    row_id <- row_id + 1
+    
+    if(!(row_id %in% test_idx)) next
+    
+    # ------------------------
+    # MIXED TEXT (label = 1)
+    # ------------------------
+    
+    y <- text_to_fw_indices(mixedtexts$texts[[i]][[j]], functionwords)
+    
+    cps <- cp_posterior(y, humantheta, GPTtheta, 
+                        skip = skip, min_length = min_length)
+    
+    M0 <- sequenceLikelihood(y, humantheta)
+    M1 <- logmeanexp(cps$loglik)
+    
+    logBF <- M0 - M1
+    
+    logBFs <- c(logBFs, logBF)
+    true_labels <- c(true_labels, 1)
+    row_ids <- c(row_ids, row_id)
+  }
+}
 
 
-
-
-
-
-
+pred_labels <- ifelse(logBFs < 0, 1, 0)
+mean(pred_labels == true_labels)
+table(Predicted = pred_labels, Actual = true_labels)
 
 
 
