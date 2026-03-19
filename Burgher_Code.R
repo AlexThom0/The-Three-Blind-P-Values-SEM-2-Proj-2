@@ -17,12 +17,6 @@ truecps200 <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/changepoints200/")
 
 
 
-
-
-
-
-
-
 ## 500 length texts
 
 skip <- 50
@@ -91,7 +85,111 @@ for(i in 1:length(mixedtexts100$texts))
 
 
 ###### Figuring out training and test split stuff
-set.seed(123) 
+
+set.seed(123)
+n <- nrow(humancounts)
+
+train_500 <- sample(1:n, size = floor(0.7 * n))
+test_500  <- setdiff(1:n, train_500)
+
+
+alpha <- 1
+
+GPT_train500 <- GPTcounts[train_500, ]
+human_train500 <- humancounts[train_500, ]
+
+GPTtheta500 <- apply(GPT_train500, 2, sum)
+GPTtheta500 <- (GPTtheta500 + alpha) / sum(GPTtheta500 + alpha)
+
+humantheta500 <- apply(human_train500, 2, sum)
+humantheta500 <- (humantheta500 + alpha) / sum(humantheta500 + alpha)
+
+
+
+skip <- 50
+min_length <- 100
+
+row_id <- 0
+
+all_errors_start <- c()
+all_errors_end <- c()
+
+for(i in 1:length(mixedtexts$texts)) {
+  for(j in 1:length(mixedtexts$texts[[i]])) {
+    
+    row_id <- row_id + 1   # IMPORTANT: matches matrix rows
+    
+    if(!(row_id %in% test_500)) next
+    
+    y <- text_to_fw_indices(mixedtexts$texts[[i]][[j]], functionwords)
+    
+    cps <- cp_posterior(y, humantheta500, GPTtheta500, 
+                        skip = skip, min_length = min_length)
+    
+    # estimates
+    est1 <- cps[1, 1]
+    est2 <- cps[1, 2]
+    
+    # truth
+    true_vals <- as.numeric(strsplit(truecps$texts[[i]][[j]], ",")[[1]])
+    true1 <- true_vals[1]
+    true2 <- true_vals[2]
+    
+    # errors
+    err1 <- abs(est1 - true1)
+    err2 <- abs(est2 - true2)
+    
+    all_errors_start <- c(all_errors_start, err1)
+    all_errors_end   <- c(all_errors_end, err2)
+    
+    print(paste(
+      "Row:", row_id,
+      "| Est:", est1, est2,
+      "| True:", true1, true2,
+      "| Err1:", err1,
+      "| Err2:", err2
+    ))
+  }
+}
+
+mean_error_start <- mean(all_errors_start)
+mean_error_end   <- mean(all_errors_end)
+
+median_error_start <- median(all_errors_start)
+median_error_end   <- median(all_errors_end)
+
+print(paste("Mean Start Error:", round(mean_error_start, 2)))
+print(paste("Mean End Error:", round(mean_error_end, 2)))
+
+print(paste("Median Start Error:", median_error_start))
+print(paste("Median End Error:", median_error_end))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Create folder map from human texts (works for all lengths)
 # Because the folder structure is the same across all datasets
@@ -218,82 +316,70 @@ results100 <- analyze_test_set(
 
 
 
-logBFs <- c()
-true_labels <- c()
-row_ids <- c()
 
-row_id <- 0
-
-for(i in 1:length(humantexts$texts)) {
-  for(j in 1:length(humantexts$texts[[i]])) {
-    
-    row_id <- row_id + 1
-    
-    if(!(row_id %in% test_idx)) next
-    
-    # ------------------------
-    # HUMAN TEXT (label = 0)
-    # ------------------------
-    
-    y <- text_to_fw_indices(humantexts$texts[[i]][[j]], functionwords)
-    
-    cps <- cp_posterior(y, humantheta, GPTtheta, 
-                        skip = skip, min_length = min_length)
-    
-    M0 <- sequenceLikelihood(y, humantheta)
-    M1 <- logmeanexp(cps$loglik)
-    
-    logBF <- M0 - M1
-    
-    logBFs <- c(logBFs, logBF)
-    true_labels <- c(true_labels, 0)
-    row_ids <- c(row_ids, row_id)
-  }
-}
-
-
-row_id <- 0
-
-for(i in 1:length(mixedtexts$texts)) {
-  for(j in 1:length(mixedtexts$texts[[i]])) {
-    
-    row_id <- row_id + 1
-    
-    if(!(row_id %in% test_idx)) next
-    
-    # ------------------------
-    # MIXED TEXT (label = 1)
-    # ------------------------
-    
-    y <- text_to_fw_indices(mixedtexts$texts[[i]][[j]], functionwords)
-    
-    cps <- cp_posterior(y, humantheta, GPTtheta, 
-                        skip = skip, min_length = min_length)
-    
-    M0 <- sequenceLikelihood(y, humantheta)
-    M1 <- logmeanexp(cps$loglik)
-    
-    logBF <- M0 - M1
-    
-    logBFs <- c(logBFs, logBF)
-    true_labels <- c(true_labels, 1)
-    row_ids <- c(row_ids, row_id)
-  }
-}
-
-
-pred_labels <- ifelse(logBFs < 0, 1, 0)
-mean(pred_labels == true_labels)
-table(Predicted = pred_labels, Actual = true_labels)
+###### Figuring out training and test split stuff
 
 
 
 
 
+# Calculate mean frequencies for each word
+human_means <- colMeans(humancounts)
+gpt_means <- colMeans(GPTcounts)
+
+# Identify the indices of the most used words
+top_indices <- order(human_means, decreasing = TRUE)[2:11]
+
+# Create a comparison table
+top_words_comparison <- data.frame(
+  Word = functionwords[top_indices],
+  Human_Avg = round(human_means[top_indices], 4),
+  GPT_Avg = round(gpt_means[top_indices], 4)
+)
+
+print(top_words_comparison)
 
 
 
 
+
+plot(human_means, gpt_means, 
+     pch = 16, col = rgb(0, 0, 1, 0.5),
+     xlab = "Human Word Frequency", 
+     ylab = "GPT Word Frequency",
+     main = "Word Frequency Comparison")
+abline(a = 0, b = 1, col = "red", lty = 2) # The "Identity" line
+
+# Label the words that are furthest from the line
+text(human_means[top_indices], gpt_means[top_indices], 
+     labels = functionwords[top_indices], pos = 3, cex = 0.8)
+
+
+
+
+human_lengths <- rowSums(humancounts)
+gpt_lengths <- rowSums(GPTcounts)
+
+hist(human_lengths, col=rgb(0,0,1,0.5), main="Distribution of Function Word Counts", xlab="Number of Function Words")
+hist(gpt_lengths, col=rgb(1,0,0,0.5), add=TRUE)
+legend("topright", legend=c("Human", "GPT"), fill=c(rgb(0,0,1,0.5), rgb(1,0,0,0.5)))
+
+
+hist(gpt_lengths)
+
+
+
+# Combine data and run PCA
+combined_counts <- rbind(humancounts, GPTcounts)
+pca_res <- prcomp(combined_counts, scale. = TRUE)
+
+# Plot the first two components
+plot(pca_res$x[,1], pca_res$x[,2], 
+     col = c(rep("blue", nrow(humancounts)), rep("red", nrow(GPTcounts))),
+     pch = 16, cex = 0.6,
+     xlab = "PC1", ylab = "PC2", 
+     main = "Style Clustering (PCA)")
+legend("topright", legend=c("Human", "GPT"), col=c("blue", "red"), pch=16)
 
 
 
