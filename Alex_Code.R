@@ -16,6 +16,14 @@ mixedtexts <- loadCorpusText("essays/mixed500/")
 truecps <- loadCorpusText("essays/changepoints500/")
 
 
+
+row_normalise <- function(X) {
+  rs <- rowSums(X)
+  X / rs
+}
+
+norm_GPT <- row_normalise(GPTcounts)
+
 ### next we create n x 201 matrices where each row corresponds to one text, and the columns are function word counts
 ###Note: this can be slow since it is reading many files, I would advise running it once and saving the results
 #
