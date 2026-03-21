@@ -1,5 +1,3 @@
-# Alex Code
-
 #load in the functions I have provided. You will need to change this to point to the directory
 #which you donloaded the files to.
 source("assignment2-functions.R")
@@ -320,6 +318,7 @@ mixed_pred_gpt <- mixed_test_logBF <= log_gamma
 
 false_positive_rate <- mean(human_pred_gpt)
 true_positive_rate  <- mean(mixed_pred_gpt)
+total = sum(!human_pred_gpt) + sum(human_pred_gpt) + sum(!mixed_pred_gpt) + sum(mixed_pred_gpt)
 
 confusion_mat <- matrix(
   c(sum(!human_pred_gpt), sum(human_pred_gpt),
