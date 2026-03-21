@@ -518,5 +518,150 @@ save(project_results, file = "project_results_500.RData")
 
 
 
+# ----------------- Gamma Tuning Attempt :0--------
 
 
+gamma_tradeoff <- function(human_logBF, mixed_logBF, gamma_grid = NULL) {
+  
+  if (is.null(gamma_grid)) {
+    all_scores <- c(human_logBF, mixed_logBF)
+    gamma_grid <- seq(
+      from = min(all_scores),
+      to   = max(all_scores),
+      length.out = 200
+    )
+  }
+  
+  out <- data.frame(
+    log_gamma = gamma_grid,
+    gamma = exp(gamma_grid),
+    FPR = NA_real_,   # false positive rate on human
+    TPR = NA_real_,   # true positive rate on mixed
+    FNR = NA_real_,   # false negative rate on mixed
+    TNR = NA_real_,   # true negative rate on human
+    Precision = NA_real_,
+    Recall = NA_real_,
+    F1 = NA_real_,
+    BalancedAccuracy = NA_real_
+  )
+  
+  for (i in seq_along(gamma_grid)) {
+    g <- gamma_grid[i]
+    
+    # Predict GPT if logBF <= g
+    human_pred_gpt <- human_logBF <= g
+    mixed_pred_gpt <- mixed_logBF <= g
+    
+    TP <- sum(mixed_pred_gpt)
+    FN <- sum(!mixed_pred_gpt)
+    FP <- sum(human_pred_gpt)
+    TN <- sum(!human_pred_gpt)
+    
+    FPR <- if ((FP + TN) > 0) FP / (FP + TN) else NA_real_
+    TPR <- if ((TP + FN) > 0) TP / (TP + FN) else NA_real_
+    FNR <- if ((TP + FN) > 0) FN / (TP + FN) else NA_real_
+    TNR <- if ((FP + TN) > 0) TN / (FP + TN) else NA_real_
+    
+    Precision <- if ((TP + FP) > 0) TP / (TP + FP) else NA_real_
+    Recall    <- TPR
+    F1 <- if (!is.na(Precision) && !is.na(Recall) && (Precision + Recall) > 0) {
+      2 * Precision * Recall / (Precision + Recall)
+    } else {
+      NA_real_
+    }
+    
+    BA <- mean(c(TPR, TNR), na.rm = TRUE)
+    
+    out$FPR[i] <- FPR
+    out$TPR[i] <- TPR
+    out$FNR[i] <- FNR
+    out$TNR[i] <- TNR
+    out$Precision[i] <- Precision
+    out$Recall[i] <- Recall
+    out$F1[i] <- F1
+    out$BalancedAccuracy[i] <- BA
+  }
+  
+  out
+}
+
+# Build the trade-off table on the TEST SET
+gamma_results <- gamma_tradeoff(
+  human_logBF = human_test_logBF,
+  mixed_logBF = mixed_test_logBF
+)
+
+head(gamma_results)
+
+############################################
+### PLOT 1: TPR and FPR against log(gamma) ###
+############################################
+
+plot(
+  gamma_results$log_gamma, gamma_results$TPR,
+  type = "l", lwd = 2,
+  xlab = expression(log(gamma)),
+  ylab = "Rate",
+  ylim = c(0, 1),
+  main = "Detection trade-off as the threshold varies"
+)
+
+lines(gamma_results$log_gamma, gamma_results$FPR, lwd = 2, lty = 2)
+
+abline(v = log_gamma, lwd = 2, lty = 3)
+
+legend(
+  "bottomright",
+  legend = c("True Positive Rate", "False Positive Rate", "Chosen threshold"),
+  lwd = c(2, 2, 2),
+  lty = c(1, 2, 3),
+  bty = "n"
+)
+
+
+
+error_df <- data.frame(
+  Error = c(err_c1, err_c2),
+  Type = rep(c("Start Point (τ1)", "End Point (τ2)"), each = length(err_c1))
+)
+
+library(dplyr)
+
+stats_df <- error_df %>%
+  group_by(Type) %>%
+  summarise(
+    mean_error = 200,
+    pct_above_mean = mean(Error > mean_error) * 100
+  )
+
+ggplot(error_df, aes(x = Type, y = Error, fill = Type)) +
+  geom_violin(alpha = 0.7) +
+  
+  # Mean line
+  geom_crossbar(
+    data = stats_df,
+    aes(x = Type, y = mean_error, ymin = mean_error, ymax = mean_error),
+    width = 0.5,
+    colour = "black",
+    fatten = 0
+  ) +
+  
+  # % above mean label
+  geom_text(
+    data = stats_df,
+    aes(
+      x = Type,
+      y = mean_error,
+      label = paste0(round(pct_above_mean, 1), "% above 200 words")
+    ),
+    vjust = -1,
+    size = 4
+  ) +
+  
+  labs(
+    title = "Distribution of Change Point Localisation Errors",
+    x = NULL,
+    y = "Absolute Error (words)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
