@@ -437,6 +437,7 @@ project_results <- list(
 )
 
 save(project_results, file = "project_results_100.RData")
+results_100 <- get(load('project_results_100.RData'))
 
 
 

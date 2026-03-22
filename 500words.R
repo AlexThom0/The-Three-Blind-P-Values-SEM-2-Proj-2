@@ -9,9 +9,9 @@ source("assignment2-functions.R")
 functionwords <- readLines("wordfile200 (1).txt") #function word list
 humantexts <- loadCorpusText("essays/human/")
 
-GPTtexts <- loadCorpusText("essays/GPT200/")
-mixedtexts <- loadCorpusText("essays/mixed200/")
-truecps <- loadCorpusText("essays/changepoints200/")
+GPTtexts <- loadCorpusText("essays/GPT500/")
+mixedtexts <- loadCorpusText("essays/mixed500/")
+truecps <- loadCorpusText("essays/changepoints500/")
 
 #IMPORTANT NOTE (mentioned on assessment sheet): if you are subsetting these matrices to do a training-test split, then it is crucial
 #to understand that the indexes of the essays are the same across each matrix.
@@ -38,7 +38,7 @@ truecps <- loadCorpusText("essays/changepoints200/")
 
 alpha <- 1
 
-GPTtheta <- apply(GPTcounts200,2,sum); 
+GPTtheta <- apply(GPTcounts,2,sum); 
 GPTtheta <- (GPTtheta + alpha) / sum(GPTtheta + alpha)
 
 humantheta <- apply(humancounts,2,sum); 
@@ -143,10 +143,10 @@ mixed_flat_texts <- flatten_texts(mixedtexts)
 
 # Optional checks
 stopifnot(length(human_flat_texts) == nrow(humancounts))
-stopifnot(length(mixed_flat_texts) == nrow(mixedcounts200))
-stopifnot(nrow(humancounts) == nrow(GPTcounts200))
-stopifnot(nrow(humancounts) == nrow(mixedcounts200))
-stopifnot(nrow(humancounts) == nrow(truechangepoints200))
+stopifnot(length(mixed_flat_texts) == nrow(mixedcounts))
+stopifnot(nrow(humancounts) == nrow(GPTcounts))
+stopifnot(nrow(humancounts) == nrow(mixedcounts))
+stopifnot(nrow(humancounts) == nrow(truechangepoints))
 
 #########################################
 ### 2. Proper aligned train/test split ###
@@ -175,7 +175,7 @@ estimate_theta <- function(count_matrix, alpha = 1) {
 
 alpha <- 1
 humantheta_train <- estimate_theta(humancounts[train_idx, , drop = FALSE], alpha = alpha)
-GPTtheta_train   <- estimate_theta(GPTcounts200[train_idx, , drop = FALSE], alpha = alpha)
+GPTtheta_train   <- estimate_theta(GPTcounts[train_idx, , drop = FALSE], alpha = alpha)
 
 #########################################
 ### 4. Wrapper: one-text Bayes factor  ###
@@ -264,8 +264,6 @@ gamma <- exp(log_gamma)
 
 cat("Chosen log(gamma) =", round(log_gamma, 4), "\n")
 cat("Chosen gamma      =", signif(gamma, 4), "\n")
-
-
 
 #########################################
 ### 7. Detection on held-out test set ###
@@ -438,8 +436,10 @@ project_results <- list(
   alpha = alpha
 )
 
-save(project_results, file = "project_results_200.RData")
-results_200 <- get(load('project_results_200.RData'))
+save(project_results, file = "project_results_500.RData")
+results_500 <- get(load('project_results_500.RData'))
+
+
 
 
 
