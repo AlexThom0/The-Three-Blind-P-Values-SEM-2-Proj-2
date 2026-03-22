@@ -597,26 +597,50 @@ head(gamma_results)
 ### PLOT 1: TPR and FPR against log(gamma) ###
 ############################################
 
-plot(
-  gamma_results$log_gamma, gamma_results$TPR,
-  type = "l", lwd = 2,
-  xlab = expression(log(gamma)),
-  ylab = "Rate",
-  ylim = c(0, 1),
-  main = "Detection trade-off as the threshold varies"
+library(ggplot2)
+library(tidyr)
+install.packages("latex2exp")
+library(latex2exp)
+
+plot_df_long <- pivot_longer(
+  data.frame(
+    log_gamma = gamma_results$log_gamma,
+    TPR = gamma_results$TPR,
+    FPR = gamma_results$FPR
+  ),
+  cols = c(TPR, FPR),
+  names_to = "Metric",
+  values_to = "Rate"
 )
 
-lines(gamma_results$log_gamma, gamma_results$FPR, lwd = 2, lty = 2)
+ggplot(plot_df_long, aes(x = log_gamma, y = Rate, colour = Metric)) +
+  geom_line(size = 1) +
+  
+  # threshold line
+  geom_vline(xintercept = log_gamma, linetype = "dashed") +
+  
+  geom_text(
+    x = log_gamma,
+    y = 0.5,
+    label = TeX("Chosen $\\gamma$"),
+    angle = 90,
+    vjust = -0.5,
+    size = 4,
+    colour = "black",
+    inherit.aes = FALSE
+  )+
+  
+  labs(
+    title = "Detection Trade-off as the Threshold Varies",
+    x = expression(log(gamma)),
+    y = "Rate",
+    colour = "Metric"
+  ) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_minimal()
 
-abline(v = log_gamma, lwd = 2, lty = 3)
 
-legend(
-  "bottomright",
-  legend = c("True Positive Rate", "False Positive Rate", "Chosen threshold"),
-  lwd = c(2, 2, 2),
-  lty = c(1, 2, 3),
-  bty = "n"
-)
+
 
 
 
@@ -625,7 +649,11 @@ error_df <- data.frame(
   Type = rep(c("Start Point (τ1)", "End Point (τ2)"), each = length(err_c1))
 )
 
-library(dplyr)
+error_df$Type <- factor(error_df$Type, 
+                        levels = c("Start Point (τ1)", "End Point (τ2)"))
+
+library(tidyverse)
+library(ggplot2)
 
 stats_df <- error_df %>%
   group_by(Type) %>%
@@ -635,7 +663,7 @@ stats_df <- error_df %>%
   )
 
 ggplot(error_df, aes(x = Type, y = Error, fill = Type)) +
-  geom_violin(alpha = 0.7) +
+  geom_boxplot(alpha = 0.7) +
   
   # Mean line
   geom_crossbar(
@@ -659,7 +687,7 @@ ggplot(error_df, aes(x = Type, y = Error, fill = Type)) +
   ) +
   
   labs(
-    title = "Distribution of Change Point Localisation Errors",
+    title = "Change Point Localisation Errors for 500 Word ChatGPT",
     x = NULL,
     y = "Absolute Error (words)"
   ) +
