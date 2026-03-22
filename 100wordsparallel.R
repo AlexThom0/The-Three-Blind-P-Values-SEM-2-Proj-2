@@ -217,7 +217,7 @@ auc_value <- auroc(
 ############################################
 ### 8. Localisation on mixed test essays ###
 ############################################
-
+tolerance <- skip/2  # allow for some tolerance in changepoint estimation
 cat("Evaluating localisation on mixed test essays...\n")
 
 cl <- makeCluster(n_cores)
@@ -251,6 +251,8 @@ true_c2 <- truechangepoints[test_idx, 2]
 
 err_c1 <- abs(est_c1 - true_c1)
 err_c2 <- abs(est_c2 - true_c2)
+adj_err_c1 <- ifelse(err_c1 <= tolerance, 0, err_c1 - tolerance)
+adj_err_c2 <- ifelse(err_c2 <= tolerance, 0, err_c2 - tolerance)
 
 localisation_results <- data.frame(
   doc_id         = test_idx,
@@ -264,6 +266,10 @@ mean_err_c1   <- mean(err_c1)
 mean_err_c2   <- mean(err_c2)
 median_err_c1 <- median(err_c1)
 median_err_c2 <- median(err_c2)
+adj_mean_err_c1   <- mean(adj_err_c1)
+adj_mean_err_c2   <- mean(adj_err_c2)
+adj_median_err_c1 <- median(adj_err_c1)
+adj_median_err_c2 <- median(adj_err_c2)
 
 ################################
 ### 9. Print key summaries   ###
@@ -304,6 +310,8 @@ project_results <- list(
   auc                  = auc_value,
   confusion_matrix     = confusion_mat,
   localisation_results = localisation_results,
+  adj_err_c1          = adj_err_c1,
+  adj_err_c2          = adj_err_c2,
   mean_err_c1          = mean_err_c1,
   mean_err_c2          = mean_err_c2,
   median_err_c1        = median_err_c1,
@@ -313,5 +321,9 @@ project_results <- list(
   alpha                = alpha
 )
 
-save(project_results, file = "project_results_100.RData")
-results_100 <- get(load('project_results_100.RData'))
+filename <- paste0("results_100_", skip, "_", min_length)
+save(project_results, file = paste(filename, ".RData", sep = ''))
+results <- get(load('results_100_50_100.RData'))
+paste(results$mean_err_c1,'&', results$mean_err_c2,'&', mean(results$adj_err_c1),'&', mean(results$adj_err_c2))
+paste(results$median_err_c1,'&', results$median_err_c2,'&', median(results$adj_err_c1),'&', median(results$adj_err_c2))
+

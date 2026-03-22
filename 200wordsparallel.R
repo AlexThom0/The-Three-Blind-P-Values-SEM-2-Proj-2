@@ -3,8 +3,8 @@ source("assignment2-functions.R")
 library(parallel)
 n_cores <- detectCores() - 1  # leave one core free
 
-skip       <- 50
-min_length <- 100
+skip       <- 20
+min_length <- 200
 target_fp  <- 0.05
 
 #########
@@ -313,5 +313,9 @@ project_results <- list(
   alpha                = alpha
 )
 
-save(project_results, file = "project_results_200.RData")
-results_200 <- get(load('project_results_200.RData'))
+filename <- paste0("results_200_", skip, "_", min_length)
+save(project_results, file = paste(filename, ".RData", sep = '') )
+paste(mean_err_c1,'&', mean_err_c2,'&', mean(adj_err_c1),'&', mean(adj_err_c2))
+paste(median_err_c1,'&', median_err_c2,'&', median(adj_err_c1),'&', median(adj_err_c2))
+
+
