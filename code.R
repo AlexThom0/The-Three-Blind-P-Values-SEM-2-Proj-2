@@ -294,9 +294,7 @@ compute_logBF_from_text <- function(text, functionwords, humantheta, GPTtheta,
        M1 = as.numeric(M1), cps = cps)
 }
 
-##############################################
-### 5. Wrapper: one-text localisation      ###
-##############################################
+# Estimates the ChatGPT passage's start and end point based on MAP estimate for one text
 
 locate_segment_from_text <- function(text, functionwords, humantheta, GPTtheta,
                                      skip = 50, min_length = 100) {
@@ -309,13 +307,12 @@ locate_segment_from_text <- function(text, functionwords, humantheta, GPTtheta,
        loglik    = as.numeric(best["loglik"]), cps = cps)
 }
 
-##############################################
-### 6. Tune gamma on human training essays ###
-##############################################
+# Tuning gamma on the training dataset
 
 cat("Tuning gamma on human training essays...\n")
 
-cl <- makeCluster(n_cores)
+# to make it run quicker
+cl <- makeCluster(n_cores) 
 clusterExport(cl, varlist = c(
   "compute_logBF_from_text", "text_to_fw_indices", "cp_posterior",
   "sequenceLikelihood", "logmeanexp",
@@ -338,15 +335,14 @@ train_human_logBF <- parSapply(cl, train_idx, function(idx) {
 
 stopCluster(cl)
 
+# Sets threshold to achieve target false positive rate on training data
 log_gamma <- as.numeric(quantile(train_human_logBF, probs = target_fp, names = FALSE))
 gamma     <- exp(log_gamma)
 
-cat("Chosen log(gamma) =", round(log_gamma, 4), "\n")
-cat("Chosen gamma      =", signif(gamma, 4), "\n")
+cat("Chosen log(gamma)=", round(log_gamma, 4), "\n")
+cat("Chosen gamma  =", signif(gamma, 4), "\n")
 
-#########################################
-### 7. Detection on held-out test set ###
-#########################################
+# We use the held out test dataset and perform ChatGPT passage detection with the essays in it
 
 cat("Evaluating detection on test set...\n")
 
@@ -361,35 +357,35 @@ clusterExport(cl, varlist = c(
 
 test_results <- parLapply(cl, test_idx, function(idx) {
   res_h <- compute_logBF_from_text(
-    text          = human_flat_texts[idx],
+    text  = human_flat_texts[idx],
     functionwords = functionwords,
-    humantheta    = humantheta_train,
-    GPTtheta      = GPTtheta_train,
-    skip          = skip,
-    min_length    = min_length
+    humantheta = humantheta_train,
+    GPTtheta = GPTtheta_train,
+    skip= skip,
+    min_length = min_length
   )
   res_m <- compute_logBF_from_text(
-    text          = mixed_flat_texts[idx],
+    text = mixed_flat_texts[idx],
     functionwords = functionwords,
-    humantheta    = humantheta_train,
-    GPTtheta      = GPTtheta_train,
-    skip          = skip,
-    min_length    = min_length
+    humantheta = humantheta_train,
+    GPTtheta = GPTtheta_train,
+    skip = skip,
+    min_length = min_length
   )
   list(
-    human_logBF = res_h$logBF, human_M0 = res_h$M0, human_M1 = res_h$M1,
-    mixed_logBF = res_m$logBF, mixed_M0 = res_m$M0, mixed_M1 = res_m$M1
+    human_logBF =res_h$logBF, human_M0= res_h$M0, human_M1= res_h$M1,
+    mixed_logBF = res_m$logBF, mixed_M0= res_m$M0, mixed_M1= res_m$M1
   )
 })
 #
 stopCluster(cl)
 
-human_test_logBF <- sapply(test_results, `[[`, "human_logBF")
-mixed_test_logBF <- sapply(test_results, `[[`, "mixed_logBF")
-human_H0         <- sapply(test_results, `[[`, "human_M0")
-human_H1         <- sapply(test_results, `[[`, "human_M1")
-mixed_H0         <- sapply(test_results, `[[`, "mixed_M0")
-mixed_H1         <- sapply(test_results, `[[`, "mixed_M1")
+human_test_logBF <- sapply(test_results,`[[`,"human_logBF")
+mixed_test_logBF <- sapply(test_results, `[[`,"mixed_logBF")
+human_H0 <- sapply(test_results, `[[`,"human_M0")
+human_H1 <- sapply(test_results, `[[`,"human_M1")
+mixed_H0 <- sapply(test_results, `[[`,"mixed_M0")
+mixed_H1<- sapply(test_results, `[[`,"mixed_M1")
 
 human_pred_gpt <- human_test_logBF <= log_gamma
 mixed_pred_gpt <- mixed_test_logBF <= log_gamma
@@ -413,9 +409,7 @@ auc_value <- auroc(
   H0_mixed = mixed_H0, H1_mixed = mixed_H1
 )
 
-############################################
-### 8. Localisation on mixed test essays ###
-############################################
+# Performing passage localisation on the test set
 
 cat("Evaluating localisation on mixed test essays...\n")
 
@@ -441,6 +435,8 @@ loc_results <- parLapply(cl, test_idx, function(idx) {
 
 stopCluster(cl)
 
+tolerance <- skip/2
+
 est_c1    <- sapply(loc_results, `[[`, "c1")
 est_c2    <- sapply(loc_results, `[[`, "c2")
 best_post <- sapply(loc_results, `[[`, "posterior")
@@ -450,6 +446,7 @@ true_c2 <- truechangepoints[test_idx, 2]
 
 err_c1 <- abs(est_c1 - true_c1)
 err_c2 <- abs(est_c2 - true_c2)
+
 adj_err_c1 <- ifelse(err_c1 <= tolerance, 0, err_c1 - tolerance)
 adj_err_c2 <- ifelse(err_c2 <= tolerance, 0, err_c2 - tolerance)
 
@@ -467,9 +464,7 @@ mean_err_c2   <- mean(err_c2)
 median_err_c1 <- median(err_c1)
 median_err_c2 <- median(err_c2)
 
-################################
-### 9. Print key summaries   ###
-################################
+# Print of key summary statistics
 
 cat("\n==============================\n")
 cat("DETECTION RESULTS\n")
@@ -487,37 +482,36 @@ cat("Mean |tau2 - tau2_hat|:",   round(mean_err_c2,   2), "\n")
 cat("Median |tau1 - tau1_hat|:", round(median_err_c1, 2), "\n")
 cat("Median |tau2 - tau2_hat|:", round(median_err_c2, 2), "\n")
 
-################################
-### 10. Save all outputs     ###
-################################
+# Save everything so we dont need to rerun
 
 project_results <- list(
-  train_idx            = train_idx,
-  test_idx             = test_idx,
-  humantheta_train     = humantheta_train,
-  GPTtheta_train       = GPTtheta_train,
-  log_gamma            = log_gamma,
-  gamma                = gamma,
-  train_human_logBF    = train_human_logBF,
-  human_test_logBF     = human_test_logBF,
-  mixed_test_logBF     = mixed_test_logBF,
+  train_idx = train_idx,
+  test_idx  = test_idx,
+  humantheta_train = humantheta_train,
+  GPTtheta_train  = GPTtheta_train,
+  log_gamma = log_gamma,
+  gamma = gamma,
+  train_human_logBF = train_human_logBF,
+  human_test_logBF = human_test_logBF,
+  mixed_test_logBF  = mixed_test_logBF,
   false_positive_rate  = false_positive_rate,
-  true_positive_rate   = true_positive_rate,
-  auc                  = auc_value,
-  confusion_matrix     = confusion_mat,
+  true_positive_rate = true_positive_rate,
+  auc  = auc_value,
+  confusion_matrix = confusion_mat,
   localisation_results = localisation_results,
-  adj_err_c1           = mean(adj_err_c1),
-  adj_err_c2           = mean(adj_err_c2),
-  mean_err_c1          = mean_err_c1,
-  mean_err_c2          = mean_err_c2,
-  median_err_c1        = median_err_c1,
-  median_err_c2        = median_err_c2,
-  skip                 = skip,
-  min_length           = min_length,
-  alpha                = alpha
+  adj_err_c1  = mean(adj_err_c1),
+  adj_err_c2  = mean(adj_err_c2),
+  mean_err_c1  = mean_err_c1,
+  mean_err_c2  = mean_err_c2,
+  median_err_c1  = median_err_c1,
+  median_err_c2  = median_err_c2,
+  skip    = skip,
+  min_length  = min_length,
+  alpha    = alpha
 )
 
-
+# Did the same for passages of length 100 and 200 and experimented with changing min lenght and
+# skip parameters
 
 
 
