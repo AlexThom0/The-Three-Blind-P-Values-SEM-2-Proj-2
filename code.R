@@ -187,8 +187,8 @@ global_xlim <- c(0.30, 0.70) # setting a global lim so graphs are more easily co
 
 par(mfrow=c(1,3))
 hist(human_fw_prop, xlim=global_xlim, col=rgb(0,0,1,0.5), main="Human", xlab="FW proportion")
-hist(gpt_fw_prop,   xlim=global_xlim, col=rgb(1,0,0,0.5), main="GPT",   xlab="FW proportion")
-hist(mixed_fw_prop, xlim=global_xlim, col=rgb(0.5,0,0.5,0.5), main="Mixed", xlab="FW proportion")
+hist(gpt_fw_prop,   xlim= global_xlim, col=rgb(1,0,0,0.5), main ="GPT",   xlab= "FW proportion")
+hist(mixed_fw_prop, xlim=global_xlim, col=rgb(0.5,0,0.5,0.5), main= "Mixed", xlab="FW proportion")
 
 # MDS plot
 
@@ -208,7 +208,7 @@ df <- data.frame(
 )
 
 ggplot(df, aes(x = MDS1, y = MDS2, color = Author)) +
-  geom_point(alpha = 0.5, size = 0.5) + # Added slight transparency for overlapping points
+  geom_point(alpha = 0.5, size = 0.5) + # Slight transparency for overlapping points
   scale_color_manual(values = c("Human" = "steelblue4", "GPT" = "orangered4")) +
   labs(
     title = "Style Clustering (MDS)",
@@ -251,6 +251,7 @@ flatten_texts <- function(corpus_obj) {
 human_flat_texts <- flatten_texts(humantexts)
 mixed_flat_texts  <- flatten_texts(mixedtexts)
 
+# Tests
 stopifnot(length(human_flat_texts) == nrow(humancounts))
 stopifnot(length(mixed_flat_texts) == nrow(mixedcounts))
 stopifnot(nrow(humancounts) == nrow(GPTcounts))
@@ -313,6 +314,7 @@ cat("Tuning gamma on human training essays...\n")
 
 # to make it run quicker
 cl <- makeCluster(n_cores) 
+# sends everything each worker will need to the cluster
 clusterExport(cl, varlist = c(
   "compute_logBF_from_text", "text_to_fw_indices", "cp_posterior",
   "sequenceLikelihood", "logmeanexp",
@@ -321,6 +323,7 @@ clusterExport(cl, varlist = c(
   "skip", "min_length"
 ))
 
+# Compute log Bayes factor for each training document (in parallel)
 train_human_logBF <- parSapply(cl, train_idx, function(idx) {
   res <- compute_logBF_from_text(
     text         = human_flat_texts[idx],
@@ -330,10 +333,10 @@ train_human_logBF <- parSapply(cl, train_idx, function(idx) {
     skip         = skip,
     min_length   = min_length
   )
-  res$logBF
+  res$logBF # only care about the logBF, don't need the other stuff
 })
 
-stopCluster(cl)
+stopCluster(cl) # end the work in parallel
 
 # Sets threshold to achieve target false positive rate on training data
 log_gamma <- as.numeric(quantile(train_human_logBF, probs = target_fp, names = FALSE))
@@ -346,6 +349,8 @@ cat("Chosen gamma  =", signif(gamma, 4), "\n")
 
 cat("Evaluating detection on test set...\n")
 
+# Run detection on both human and mixed essays from the test set
+
 cl <- makeCluster(n_cores)
 clusterExport(cl, varlist = c(
   "compute_logBF_from_text", "text_to_fw_indices", "cp_posterior",
@@ -354,8 +359,9 @@ clusterExport(cl, varlist = c(
   "humantheta_train", "GPTtheta_train",
   "skip", "min_length"
 ))
-
+# Runs detection on all test documents
 test_results <- parLapply(cl, test_idx, function(idx) {
+  # Human essays
   res_h <- compute_logBF_from_text(
     text  = human_flat_texts[idx],
     functionwords = functionwords,
@@ -364,6 +370,7 @@ test_results <- parLapply(cl, test_idx, function(idx) {
     skip= skip,
     min_length = min_length
   )
+  # Mixed essays
   res_m <- compute_logBF_from_text(
     text = mixed_flat_texts[idx],
     functionwords = functionwords,
@@ -377,7 +384,7 @@ test_results <- parLapply(cl, test_idx, function(idx) {
     mixed_logBF = res_m$logBF, mixed_M0= res_m$M0, mixed_M1= res_m$M1
   )
 })
-#
+
 stopCluster(cl)
 
 human_test_logBF <- sapply(test_results,`[[`,"human_logBF")
@@ -413,6 +420,7 @@ auc_value <- auroc(
 
 cat("Evaluating localisation on mixed test essays...\n")
 
+# Using parallel again
 cl <- makeCluster(n_cores)
 clusterExport(cl, varlist = c(
   "locate_segment_from_text", "text_to_fw_indices", "cp_posterior",
@@ -421,6 +429,7 @@ clusterExport(cl, varlist = c(
   "skip", "min_length"
 ))
 
+# Run for each text in test set
 loc_results <- parLapply(cl, test_idx, function(idx) {
   loc <- locate_segment_from_text(
     text          = mixed_flat_texts[idx],
@@ -437,50 +446,39 @@ stopCluster(cl)
 
 tolerance <- skip/2
 
+# Estimated change points
 est_c1    <- sapply(loc_results, `[[`, "c1")
 est_c2    <- sapply(loc_results, `[[`, "c2")
 best_post <- sapply(loc_results, `[[`, "posterior")
 
+# Tru change points
 true_c1 <- truechangepoints[test_idx, 1]
 true_c2 <- truechangepoints[test_idx, 2]
 
+# Errors
 err_c1 <- abs(est_c1 - true_c1)
 err_c2 <- abs(est_c2 - true_c2)
 
+# Adjusted error accounting for tolerance
 adj_err_c1 <- ifelse(err_c1 <= tolerance, 0, err_c1 - tolerance)
 adj_err_c2 <- ifelse(err_c2 <= tolerance, 0, err_c2 - tolerance)
 
-
+# Put results into a dataframe
 localisation_results <- data.frame(
-  doc_id         = test_idx,
-  true_c1        = true_c1,  true_c2   = true_c2,
-  est_c1         = est_c1,   est_c2    = est_c2,
-  err_c1         = err_c1,   err_c2    = err_c2,
+  doc_id  = test_idx,
+  true_c1  = true_c1,  
+  true_c2   = true_c2,
+  est_c1 = est_c1, est_c2 = est_c2,
+  err_c1  = err_c1,
+  err_c2= err_c2,
   best_posterior = best_post
 )
 
+# overall errors, median and mean of each
 mean_err_c1   <- mean(err_c1)
 mean_err_c2   <- mean(err_c2)
 median_err_c1 <- median(err_c1)
 median_err_c2 <- median(err_c2)
-
-# Print of key summary statistics
-
-cat("\n==============================\n")
-cat("DETECTION RESULTS\n")
-cat("==============================\n")
-cat("False positive rate (Human -> GPT):", round(false_positive_rate, 4), "\n")
-cat("True positive rate  (Mixed -> GPT):", round(true_positive_rate, 4), "\n")
-cat("AUROC:", round(auc_value, 4), "\n\n")
-print(confusion_mat)
-
-cat("\n==============================\n")
-cat("LOCALISATION RESULTS\n")
-cat("==============================\n")
-cat("Mean |tau1 - tau1_hat|:",   round(mean_err_c1,   2), "\n")
-cat("Mean |tau2 - tau2_hat|:",   round(mean_err_c2,   2), "\n")
-cat("Median |tau1 - tau1_hat|:", round(median_err_c1, 2), "\n")
-cat("Median |tau2 - tau2_hat|:", round(median_err_c2, 2), "\n")
 
 # Save everything so we dont need to rerun
 
