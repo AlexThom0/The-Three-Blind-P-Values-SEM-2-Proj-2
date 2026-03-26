@@ -591,6 +591,8 @@ gamma_results <- gamma_tradeoff(
   mixed_logBF = mixed_test_logBF
 )
 
+
+
 head(gamma_results)
 
 ############################################
@@ -599,7 +601,7 @@ head(gamma_results)
 
 library(ggplot2)
 library(tidyr)
-install.packages("latex2exp")
+library(tidyverse)
 library(latex2exp)
 
 plot_df_long <- pivot_longer(
@@ -638,7 +640,6 @@ ggplot(plot_df_long, aes(x = log_gamma, y = Rate, colour = Metric)) +
   ) +
   coord_cartesian(ylim = c(0, 1)) +
   theme_minimal()
-
 
 
 
@@ -693,3 +694,132 @@ ggplot(error_df, aes(x = Type, y = Error, fill = Type)) +
   ) +
   theme_minimal() +
   theme(legend.position = "none")
+
+
+
+library(ggplot2)
+
+library(fitdistrplus)
+library(dplyr)
+library(dplyr)
+library(ggplot2)
+library(MASS)
+
+start_error <- error_df %>%
+  dplyr::filter(Type == "Start Point (τ1)") %>%
+  dplyr::pull(Error)
+
+end_error <- error_df %>%
+  dplyr::filter(Type == "End Point (τ2)") %>%
+  dplyr::pull(Error)
+
+eps <- 1e-6
+fit_weib_km <- fitdistr(start_error + eps, densfun = "weibull")
+
+shape_w_km <- as.numeric(fit_weib_km$estimate["shape"])
+scale_w_km <- as.numeric(fit_weib_km$estimate["scale"])
+
+library(MASS)
+library(ggplot2)
+library(dplyr)
+
+# Extract data
+start_error <- error_df %>%
+  dplyr::filter(Type == "Start Point (τ1)") %>%
+  dplyr::pull(Error)
+
+end_error <- error_df %>%
+  dplyr::filter(Type == "End Point (τ2)") %>%
+  dplyr::pull(Error)
+
+eps <- 1e-6
+
+# =========================
+# START ERROR FITS
+# =========================
+
+# Weibull
+fit_weib_start <- fitdistr(start_error + eps, "weibull")
+shape_w_start <- fit_weib_start$estimate["shape"]
+scale_w_start <- fit_weib_start$estimate["scale"]
+
+
+
+p1 <- ggplot(data.frame(x = start_error), aes(x = x)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 40, colour = "black", fill = "steelblue") +
+  
+  # Weibull
+  stat_function(
+    fun = dweibull,
+    args = list(shape = shape_w_start, scale = scale_w_start),
+    colour = "red", linewidth = 1
+  ) +
+  
+  labs(title = "Start Error: Distribution Fits",
+       x = "Absolute Error",
+       y = "Density") +
+  theme_minimal()
+
+# =========================
+# END ERROR FITS
+# =========================
+
+# Weibull
+fit_weib_end <- fitdistr(end_error + eps, "weibull")
+shape_w_end <- fit_weib_end$estimate["shape"]
+scale_w_end <- fit_weib_end$estimate["scale"]
+
+
+p2 <- ggplot(data.frame(x = end_error), aes(x = x)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 40, colour = "black", fill = "steelblue") +
+  
+  # Weibull
+  stat_function(
+    fun = dweibull,
+    args = list(shape = shape_w_end, scale = scale_w_end),
+    colour = "red", linewidth = 1
+  ) +
+  
+  labs(title = "End Error: Distribution Fits",
+       x = "Absolute Error",
+       y = "Density") +
+  theme_minimal()
+
+# Combine
+p1 + p2
+
+# Theoretical mean/variance of fitted Weibull
+
+weibull_mean_end <- scale_w_end * gamma(1 + 1/shape_w_end)
+weibull_var_end  <- scale_w_end^2 * (gamma(1 + 2/shape_w_end) - (gamma(1 + 1/shape_w_end))^2)
+
+weibull_mean_end
+weibull_var_end
+
+weibull_mean_start <- scale_w_start * gamma(1 + 1/shape_w_start)
+weibull_var_start  <- scale_w_start^2 * (gamma(1 + 2/shape_w_start) - (gamma(1 + 1/shape_w_start))^2)
+
+weibull_mean_start
+weibull_var_start
+
+# Compare with empirical
+mean(start_error)
+var(start_error)
+
+
+
+proj_100_results$auc
+
+proj_200_results$auc
+
+proj_500_results$auc
+
+
+
+
+
+
+
+
