@@ -54,9 +54,9 @@ save(humancounts, mixedcounts, GPTcounts, truechangepoints, functionwords,
 
 
 # Doing same for 100 word ChatGPT segment lengths
-GPTtexts100 <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/GPT100/")
-mixedtexts100 <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/mixed100/")
-truecps100 <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/changepoints100/")
+GPTtexts100 <- loadCorpusText("essays/GPT100/")
+mixedtexts100 <- loadCorpusText("essays/mixed100/")
+truecps100 <- loadCorpusText("essays/changepoints100/")
 
 K <- length(functionwords) + 1
 GPTcounts100 <- NULL
@@ -100,9 +100,9 @@ save(humancounts, mixedcounts100, GPTcounts100, truechangepoints100, functionwor
 
 
 # Lastly, doing the same for the 200 word long ChatGPT segment lengths
-GPTtexts200 <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/GPT200/")
-mixedtexts200 <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/mixed200/")
-truecps200 <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/changepoints200/")
+GPTtexts200 <- loadCorpusText("essays/GPT200/")
+mixedtexts200 <- loadCorpusText("essays/mixed200/")
+truecps200 <- loadCorpusText("essays/changepoints200/")
 
 
 K <- length(functionwords) + 1
