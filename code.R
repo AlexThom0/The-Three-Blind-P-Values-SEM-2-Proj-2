@@ -165,7 +165,6 @@ p2<-ggplot(data = cpdf)+
   theme_minimal()+
   theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
-p1
 # Table of top function word differences relative to each other (only done for 500 word length GPT passages)
 
 human_props <- humancounts / rowSums(humancounts)
@@ -535,12 +534,14 @@ ggplot(plot_df_long, aes(x = log_gamma, y = Rate, colour = Metric)) +
   # threshold line
   geom_vline(xintercept = log_gamma, linetype = "dashed") +
   
-  geom_text(
-    x = log_gamma,y = 0.5, label = TeX("Chosen $\\gamma$"), angle = 90,
-    vjust = -0.5, size = 4,
+  annotate(
+    "text",
+    x = log_gamma, y = 0.5, 
+    label = as.character(TeX("Chosen $\\gamma$")), angle = 90, vjust = -0.5, 
+    size = 4,
     colour = "black",
-    inherit.aes = FALSE # used as some layers dont use same aesthetic
-  )+
+    parse = TRUE 
+  ) +
   
   labs(
     title = "Detection Trade-off as the Threshold Varies",
