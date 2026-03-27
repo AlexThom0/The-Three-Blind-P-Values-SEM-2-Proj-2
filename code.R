@@ -1,17 +1,17 @@
 #### Code.R ####
-source("~/Desktop/SCS Final Project/assignment2-functions.R")
+source("assignment2-functions.R")
 
 
 #### Extracting the stuff that needs extracted #####
 
 
 # 500 word ChatGPT segment length extractions
-functionwords <- readLines("~/Desktop/SCS/SCS Final/wordfile200 (1).txt") 
-humantexts <- loadCorpusText("~/Desktop/SCS/SCS Final/essays/human/")
+functionwords <- readLines("wordfile200 (1).txt") 
+humantexts <- loadCorpusText("essays/human/")
 
-GPTtexts <- loadCorpusText("~/Desktop/SCS Final Project//essays/GPT500/")
-mixedtexts <- loadCorpusText("~/Desktop/SCS Final Project/essays/mixed500/")
-truecps <- loadCorpusText("~/Desktop/SCS Final Project/essays/changepoints500/")
+GPTtexts <- loadCorpusText("essays/GPT500/")
+mixedtexts <- loadCorpusText("essays/mixed500/")
+truecps <- loadCorpusText("essays/changepoints500/")
 
 K <- length(functionwords) + 1
 GPTcounts <- NULL
