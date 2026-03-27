@@ -148,10 +148,10 @@ save(humancounts, mixedcounts200, GPTcounts200, truechangepoints200, functionwor
 
 # Distribution of essay length plot
 
-lengths = rowSums(humancounts[test_idx,])
-cpdf <- as.data.frame.array(truechangepoints100)
+lengths = rowSums(humancounts)
+cpdf <- as.data.frame.array(truechangepoints)
 library(patchwork)
-p1<-ggplot(data = cpdf)+
+p1<-ggplot(data = as.data.frame(lengths))+
   geom_histogram(aes(x = lengths), binwidth = 100, fill = "steelblue4", color = "black")+
   labs(title = "Distribution of Essay Lengths (Word Count)", x = "Essay Length (words)", y = "Frequency")+
   theme_minimal()+
@@ -165,8 +165,7 @@ p2<-ggplot(data = cpdf)+
   theme_minimal()+
   theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
-
-
+p1
 # Table of top function word differences relative to each other (only done for 500 word length GPT passages)
 
 human_props <- humancounts / rowSums(humancounts)
