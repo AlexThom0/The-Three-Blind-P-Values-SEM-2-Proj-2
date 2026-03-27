@@ -322,8 +322,6 @@ locate_segment_from_text <- function(text, functionwords, humantheta, GPTtheta,
 
 # Tuning gamma on the training dataset
 
-cat("Tuning gamma on human training essays...\n")
-
 # to make it run quicker
 cl <- makeCluster(n_cores) 
 # sends everything each worker will need to the cluster
@@ -515,6 +513,77 @@ project_results <- list(
 # skip parameters
 
 
+# Tuning Gamma stuff
+
+gamma_tradeoff<- function(human_logBF, mixed_logBF, gamma_grid = NULL) {
+  
+  if (is.null(gamma_grid)) {
+    all_scores <- c(human_logBF, mixed_logBF)
+    gamma_grid <- seq(
+      from = min(all_scores),
+      to = max(all_scores),
+      length.out = 200
+    )
+  }
+  
+  out <- data.frame(
+    log_gamma = gamma_grid,
+    gamma = exp(gamma_grid),
+    FPR= NA_real_,  TPR= NA_real_, FNR= NA_real_, TNR= NA_real_,   
+    Precision = NA_real_,
+    Recall = NA_real_,
+    F1 = NA_real_,
+    BalancedAccuracy = NA_real_
+  )
+  
+  for (i in seq_along(gamma_grid)) {
+    g <- gamma_grid[i]
+    
+    # Predict GPT if logBF <= g
+    human_pred_gpt <- human_logBF<= g
+    mixed_pred_gpt <- mixed_logBF<= g
+    
+    TP <- sum(mixed_pred_gpt)
+    FN <- sum(!mixed_pred_gpt)
+    FP <- sum(human_pred_gpt)
+    TN <- sum(!human_pred_gpt)
+    
+    FPR <-if ((FP+ TN)> 0) FP/ (FP + TN) else NA_real_
+    TPR <-if ((TP+FN) >0) TP /(TP+ FN) else NA_real_
+    FNR <-if ((TP + FN) > 0) FN/(TP + FN) else NA_real_
+    TNR <-if ((FP + TN) >0) TN /(FP + TN) else NA_real_
+    
+    Precision <- if ((TP +FP) > 0) TP / (TP + FP) else NA_real_
+    Recall <- TPR
+    F1 <- if (!is.na(Precision) && !is.na(Recall) && (Precision + Recall) > 0) {
+      2 * Precision * Recall / (Precision + Recall)
+    } else {
+      NA_real_
+    }
+    
+    BA <- mean(c(TPR, TNR), na.rm = TRUE)
+    
+    out$FPR[i]<- FPR
+    out$TPR[i]<- TPR
+    out$FNR[i]<- FNR
+    out$TNR[i]<- TNR
+    out$Precision[i] <- Precision
+    out$Recall[i] <- Recall
+    out$F1[i] <- F1
+    out$BalancedAccuracy[i] <- BA
+  }
+  
+  out
+}
+
+# Build the trade-off table on the TEST SET
+gamma_results <- gamma_tradeoff(
+  human_logBF = human_test_logBF,
+  mixed_logBF = mixed_test_logBF
+)
+
+
+
 library(latex2exp)
 
 plot_df_long <- pivot_longer(
@@ -551,7 +620,6 @@ ggplot(plot_df_long, aes(x = log_gamma, y = Rate, colour = Metric)) +
   ) +
   coord_cartesian(ylim = c(0, 1)) +
   theme_minimal()
-
 
 
 # Box plot for change point errors for 500 word ChatGPT passages
