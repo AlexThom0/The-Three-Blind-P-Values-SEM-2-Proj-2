@@ -161,11 +161,10 @@ p1<-ggplot(data = as.data.frame(lengths))+
 
 p2<-ggplot(data = cpdf)+
   geom_histogram(aes(x = (V2-V1)), binwidth = 2, fill = "steelblue4", color = "black")+
-  labs(title = "Distribution of ChatGPT Segment Lengths", x = "Segment Length", y = "Frequency")+
+  labs(title = "Distribution of ChatGPT Segment Lengths", x = "Segment Length (words)", y = "Frequency")+
   theme_minimal()+
   theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
-p1
 # Table of top function word differences relative to each other (only done for 500 word length GPT passages)
 
 human_props <- humancounts / rowSums(humancounts)
