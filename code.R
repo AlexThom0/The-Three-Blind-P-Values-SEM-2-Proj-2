@@ -147,8 +147,23 @@ save(humancounts, mixedcounts200, GPTcounts200, truechangepoints200, functionwor
 
 
 # Distribution of essay length plot
+
+lengths = rowSums(humancounts[test_idx,])
+cpdf <- as.data.frame.array(truechangepoints100)
+library(patchwork)
+p1<-ggplot(data = cpdf)+
+  geom_histogram(aes(x = lengths), binwidth = 100, fill = "steelblue4", color = "black")+
+  labs(title = "Distribution of Essay Lengths (Word Count)", x = "Essay Length (words)", y = "Frequency")+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
 # Distribution of ChatGPT passage length plot
 
+p2<-ggplot(data = cpdf)+
+  geom_histogram(aes(x = (V2-V1)), binwidth = 2, fill = "steelblue4", color = "black")+
+  labs(title = "Distribution of ChatGPT Segment Lengths", x = "Segment Length", y = "Frequency")+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
 
 
@@ -218,8 +233,7 @@ ggplot(df, aes(x = MDS1, y = MDS2, color = Author)) +
   theme_minimal() + 
   theme(
     legend.position = "top",
-    plot.title = element_text(hjust = 0.5, face = "bold") 
-  )
+    plot.title = element_text(hjust = 0.5, face = "bold"))
 
 
 
@@ -249,7 +263,7 @@ flatten_texts <- function(corpus_obj) {
 }
 
 human_flat_texts <- flatten_texts(humantexts)
-mixed_flat_texts  <- flatten_texts(mixedtexts)
+mixed_flat_texts <- flatten_texts(mixedtexts)
 
 # Tests
 stopifnot(length(human_flat_texts) == nrow(humancounts))
@@ -262,14 +276,14 @@ stopifnot(nrow(humancounts) == nrow(truechangepoints))
 make_aligned_split <- function(n, train_prop = 0.7, seed = 1) {
   set.seed(seed)
   train_idx <- sample(seq_len(n), size = floor(train_prop * n), replace = FALSE)
-  test_idx  <- setdiff(seq_len(n), train_idx)
+  test_idx <- setdiff(seq_len(n), train_idx)
   list(train = sort(train_idx), test = sort(test_idx))
 }
 
-n_docs    <- nrow(humancounts)
+n_docs <- nrow(humancounts)
 split_obj <- make_aligned_split(n_docs, train_prop = 0.7, seed = 1)
 train_idx <- split_obj$train
-test_idx  <- split_obj$test
+test_idx <- split_obj$test
 
 # Estimating theta_c and theta_h from only the training data set
 
@@ -278,19 +292,19 @@ estimate_theta <- function(count_matrix, alpha = 1) {
   (theta + alpha) / sum(theta + alpha)
 }
 humantheta_train <- estimate_theta(humancounts[train_idx, , drop = FALSE], alpha = alpha)
-GPTtheta_train   <- estimate_theta(GPTcounts[train_idx, , drop = FALSE], alpha = alpha)
+GPTtheta_train <- estimate_theta(GPTcounts[train_idx, , drop = FALSE], alpha = alpha)
 
 
 # Computes the log Bayes factor for one text
 
 compute_logBF_from_text <- function(text, functionwords, humantheta, GPTtheta,
                                     skip = 50, min_length = 100) {
-  y   <- text_to_fw_indices(text, functionwords)
+  y <- text_to_fw_indices(text, functionwords)
   cps <- cp_posterior(x = y, human_theta = humantheta, gpt_theta = GPTtheta,
                       skip = skip, min_length = min_length)
-  M0     <- sequenceLikelihood(y, humantheta)
-  M1     <- logmeanexp(cps[, "loglik"])
-  logBF  <- M0 - M1
+  M0 <- sequenceLikelihood(y, humantheta)
+  M1 <- logmeanexp(cps[, "loglik"])
+  logBF <- M0 - M1
   list(logBF = as.numeric(logBF), M0 = as.numeric(M0),
        M1 = as.numeric(M1), cps = cps)
 }
@@ -299,8 +313,8 @@ compute_logBF_from_text <- function(text, functionwords, humantheta, GPTtheta,
 
 locate_segment_from_text <- function(text, functionwords, humantheta, GPTtheta,
                                      skip = 50, min_length = 100) {
-  y    <- text_to_fw_indices(text, functionwords)
-  cps  <- cp_posterior(x = y, human_theta = humantheta, gpt_theta = GPTtheta,
+  y <- text_to_fw_indices(text, functionwords)
+  cps <- cp_posterior(x = y, human_theta = humantheta, gpt_theta = GPTtheta,
                        skip = skip, min_length = min_length)
   best <- cps[1, ]
   list(c1 = as.numeric(best["c1"]), c2 = as.numeric(best["c2"]),
@@ -326,12 +340,12 @@ clusterExport(cl, varlist = c(
 # Compute log Bayes factor for each training document (in parallel)
 train_human_logBF <- parSapply(cl, train_idx, function(idx) {
   res <- compute_logBF_from_text(
-    text         = human_flat_texts[idx],
+    text = human_flat_texts[idx],
     functionwords = functionwords,
-    humantheta   = humantheta_train,
-    GPTtheta     = GPTtheta_train,
-    skip         = skip,
-    min_length   = min_length
+    humantheta = humantheta_train,
+    GPTtheta = GPTtheta_train,
+    skip= skip,
+    min_length = min_length
   )
   res$logBF # only care about the logBF, don't need the other stuff
 })
@@ -340,16 +354,12 @@ stopCluster(cl) # end the work in parallel
 
 # Sets threshold to achieve target false positive rate on training data
 log_gamma <- as.numeric(quantile(train_human_logBF, probs = target_fp, names = FALSE))
-gamma     <- exp(log_gamma)
+gamma <- exp(log_gamma)
 
 cat("Chosen log(gamma)=", round(log_gamma, 4), "\n")
 cat("Chosen gamma  =", signif(gamma, 4), "\n")
 
 # We use the held out test dataset and perform ChatGPT passage detection with the essays in it
-
-cat("Evaluating detection on test set...\n")
-
-# Run detection on both human and mixed essays from the test set
 
 cl <- makeCluster(n_cores)
 clusterExport(cl, varlist = c(
@@ -363,7 +373,7 @@ clusterExport(cl, varlist = c(
 test_results <- parLapply(cl, test_idx, function(idx) {
   # Human essays
   res_h <- compute_logBF_from_text(
-    text  = human_flat_texts[idx],
+    text = human_flat_texts[idx],
     functionwords = functionwords,
     humantheta = humantheta_train,
     GPTtheta = GPTtheta_train,
@@ -387,6 +397,8 @@ test_results <- parLapply(cl, test_idx, function(idx) {
 
 stopCluster(cl)
 
+# Apply array indexing to extract the results
+
 human_test_logBF <- sapply(test_results,`[[`,"human_logBF")
 mixed_test_logBF <- sapply(test_results, `[[`,"mixed_logBF")
 human_H0 <- sapply(test_results, `[[`,"human_M0")
@@ -406,52 +418,47 @@ confusion_mat <- matrix(
     sum(!mixed_pred_gpt), sum(mixed_pred_gpt)),
   nrow = 2, byrow = TRUE,
   dimnames = list(
-    Truth      = c("Human", "Mixed"),
+    Truth = c("Human", "Mixed"),
     Prediction = c("PredHuman", "PredGPT")
   )
 )
 
 auc_value <- auroc(
-  H0_human = human_H0, H1_human = human_H1,
+  H0_human= human_H0, H1_human = human_H1,
   H0_mixed = mixed_H0, H1_mixed = mixed_H1
 )
 
-# Performing passage localisation on the test set
-
-cat("Evaluating localisation on mixed test essays...\n")
-
-# Using parallel again
+# Performing passage localisation on the test set using parallel again
 cl <- makeCluster(n_cores)
 clusterExport(cl, varlist = c(
   "locate_segment_from_text", "text_to_fw_indices", "cp_posterior",
   "mixed_flat_texts", "functionwords",
   "humantheta_train", "GPTtheta_train",
-  "skip", "min_length"
-))
+  "skip", "min_length"))
 
 # Run for each text in test set
 loc_results <- parLapply(cl, test_idx, function(idx) {
   loc <- locate_segment_from_text(
-    text          = mixed_flat_texts[idx],
+    text = mixed_flat_texts[idx],
     functionwords = functionwords,
-    humantheta    = humantheta_train,
-    GPTtheta      = GPTtheta_train,
-    skip          = skip,
-    min_length    = min_length
+    humantheta = humantheta_train,
+    GPTtheta = GPTtheta_train,
+    skip = skip,
+    min_length = min_length
   )
-  list(c1 = loc$c1, c2 = loc$c2, posterior = loc$posterior)
+  list(c1 =loc$c1, c2=loc$c2, posterior = loc$posterior)
 })
 
 stopCluster(cl)
 
-tolerance <- skip/2
+tolerance<- skip/2
 
-# Estimated change points
-est_c1    <- sapply(loc_results, `[[`, "c1")
-est_c2    <- sapply(loc_results, `[[`, "c2")
+# Estimated change points and extract using array indexing
+est_c1 <- sapply(loc_results, `[[`, "c1")
+est_c2 <- sapply(loc_results, `[[`, "c2")
 best_post <- sapply(loc_results, `[[`, "posterior")
 
-# Tru change points
+# True change points
 true_c1 <- truechangepoints[test_idx, 1]
 true_c2 <- truechangepoints[test_idx, 2]
 
@@ -465,18 +472,17 @@ adj_err_c2 <- ifelse(err_c2 <= tolerance, 0, err_c2 - tolerance)
 
 # Put results into a dataframe
 localisation_results <- data.frame(
-  doc_id  = test_idx,
-  true_c1  = true_c1,  
-  true_c2   = true_c2,
-  est_c1 = est_c1, est_c2 = est_c2,
-  err_c1  = err_c1,
+  doc_id= test_idx,
+  true_c1 = true_c1,  
+  true_c2 = true_c2,
+  est_c1= est_c1, est_c2 = est_c2,
+  err_c1 = err_c1,
   err_c2= err_c2,
-  best_posterior = best_post
-)
+  best_posterior = best_post)
 
 # overall errors, median and mean of each
-mean_err_c1   <- mean(err_c1)
-mean_err_c2   <- mean(err_c2)
+mean_err_c1 <- mean(err_c1)
+mean_err_c2 <- mean(err_c2)
 median_err_c1 <- median(err_c1)
 median_err_c2 <- median(err_c2)
 
@@ -484,9 +490,9 @@ median_err_c2 <- median(err_c2)
 
 project_results <- list(
   train_idx = train_idx,
-  test_idx  = test_idx,
+  test_idx = test_idx,
   humantheta_train = humantheta_train,
-  GPTtheta_train  = GPTtheta_train,
+  GPTtheta_train = GPTtheta_train,
   log_gamma = log_gamma,
   gamma = gamma,
   train_human_logBF = train_human_logBF,
@@ -494,26 +500,94 @@ project_results <- list(
   mixed_test_logBF  = mixed_test_logBF,
   false_positive_rate  = false_positive_rate,
   true_positive_rate = true_positive_rate,
-  auc  = auc_value,
+  auc = auc_value,
   confusion_matrix = confusion_mat,
   localisation_results = localisation_results,
-  adj_err_c1  = mean(adj_err_c1),
-  adj_err_c2  = mean(adj_err_c2),
-  mean_err_c1  = mean_err_c1,
-  mean_err_c2  = mean_err_c2,
-  median_err_c1  = median_err_c1,
-  median_err_c2  = median_err_c2,
-  skip    = skip,
-  min_length  = min_length,
-  alpha    = alpha
-)
+  adj_err_c1 = mean(adj_err_c1),
+  adj_err_c2 = mean(adj_err_c2),
+  mean_err_c1 = mean_err_c1,
+  mean_err_c2 = mean_err_c2,
+  median_err_c1 = median_err_c1,
+  median_err_c2 = median_err_c2,
+  skip = skip,
+  min_length = min_length,
+  alpha = alpha)
 
-# Did the same for passages of length 100 and 200 and experimented with changing min lenght and
+# Did the same for passages of length 100 and 200 and experimented with changing min length and
 # skip parameters
 
 
+library(latex2exp)
+
+plot_df_long <- pivot_longer(
+  data.frame(
+    log_gamma= gamma_results$log_gamma,
+    TPR= gamma_results$TPR,
+    FPR = gamma_results$FPR
+  ),
+  cols = c(TPR, FPR),
+  names_to = "Metric",
+  values_to = "Rate"
+)
+
+ggplot(plot_df_long, aes(x = log_gamma, y = Rate, colour = Metric)) +
+  geom_line(linewidth = 1) +
+  
+  # threshold line
+  geom_vline(xintercept = log_gamma, linetype = "dashed") +
+  
+  geom_text(
+    x = log_gamma,y = 0.5, label = TeX("Chosen $\\gamma$"), angle = 90,
+    vjust = -0.5, size = 4,
+    colour = "black",
+    inherit.aes = FALSE # used as some layers dont use same aesthetic
+  )+
+  
+  labs(
+    title = "Detection Trade-off as the Threshold Varies",
+    x = expression(log(gamma)),
+    y = "Rate",
+    colour = "Metric"
+  ) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_minimal()
 
 
 
+# Box plot for change point errors for 500 word ChatGPT passages
+
+error_df <- data.frame(
+  Error = c(err_c1, err_c2),
+  Type = rep(c("Start Point", "End Point"), each = length(err_c1)))
+
+error_df$Type <- factor(error_df$Type, levels = c("Start Point", "End Point"))
+
+
+stats_df <- error_df %>%
+  group_by(Type) %>%
+  summarise(
+    mean_error = 200,
+    pct_above_mean = mean(Error > mean_error) * 100)
+
+ggplot(error_df, aes(x = Type, y = Error, fill = Type)) +
+  geom_boxplot(alpha = 0.7) +
+  
+  # Mean line
+  geom_crossbar( data = stats_df, aes(x = Type, y = mean_error, ymin = mean_error, ymax = mean_error),
+    width = 0.5,
+    colour = "black",
+    fatten = 0) +
+  
+  geom_text(data = stats_df,
+    aes(x = Type, y = mean_error, label = paste0(round(pct_above_mean, 1), "% above 200 words")),
+    vjust = -1,
+    size = 4) +
+  
+  labs(
+    title = "Change Point Localisation Errors for 500 Word ChatGPT",
+    x = NULL,
+    y = "Absolute Error (words)") +
+  theme_minimal() +
+  theme(legend.position = "none")
 
 
