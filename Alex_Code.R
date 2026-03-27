@@ -616,7 +616,7 @@ plot_df_long <- pivot_longer(
 )
 
 ggplot(plot_df_long, aes(x = log_gamma, y = Rate, colour = Metric)) +
-  geom_line(size = 1) +
+  geom_line(linewidth = 1) +
   
   # threshold line
   geom_vline(xintercept = log_gamma, linetype = "dashed") +
@@ -643,15 +643,56 @@ ggplot(plot_df_long, aes(x = log_gamma, y = Rate, colour = Metric)) +
 
 
 
+human_test_logBF <- project_results$human_test_logBF
+
+mixed_test_logBF <- project_results$mixed_test_logBF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 error_df <- data.frame(
   Error = c(err_c1, err_c2),
-  Type = rep(c("Start Point (τ1)", "End Point (τ2)"), each = length(err_c1))
+  Type = rep(c("Start Point", "End Point"), each = length(err_c1))
 )
 
 error_df$Type <- factor(error_df$Type, 
-                        levels = c("Start Point (τ1)", "End Point (τ2)"))
+                        levels = c("Start Point", "End Point"))
 
 library(tidyverse)
 library(ggplot2)
@@ -706,11 +747,11 @@ library(ggplot2)
 library(MASS)
 
 start_error <- error_df %>%
-  dplyr::filter(Type == "Start Point (τ1)") %>%
+  dplyr::filter(Type == "Start Point") %>%
   dplyr::pull(Error)
 
 end_error <- error_df %>%
-  dplyr::filter(Type == "End Point (τ2)") %>%
+  dplyr::filter(Type == "End Point") %>%
   dplyr::pull(Error)
 
 eps <- 1e-6
@@ -725,11 +766,11 @@ library(dplyr)
 
 # Extract data
 start_error <- error_df %>%
-  dplyr::filter(Type == "Start Point (τ1)") %>%
+  dplyr::filter(Type == "Start Point") %>%
   dplyr::pull(Error)
 
 end_error <- error_df %>%
-  dplyr::filter(Type == "End Point (τ2)") %>%
+  dplyr::filter(Type == "End Point") %>%
   dplyr::pull(Error)
 
 eps <- 1e-6
